@@ -10,7 +10,8 @@ On this challenge, you're implementing a Continuos Limit Order Book (CLOB). Buye
 
 ## How to build and run
 
-_ADD YOUR INSTRUCTIONS HERE_
+Use make run 
+
 
 
 ## Deliverables
