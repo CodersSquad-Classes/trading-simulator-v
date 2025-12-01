@@ -2,6 +2,9 @@
 #include <iomanip>
 #include <string>
 #include <vector>
+#include <random>
+#include <thread>
+#include <chrono>
 
 #include "engine.h"
 #include "colors.h"
@@ -71,55 +74,84 @@ void showBook(MatchingEngine& engine, const std::string& symbol) {
     std::cout << "\n";
 }
 
-int main() {
-    MatchingEngine engine;
-    const std::string symbol = "ABC";
+void showDashboard(MatchingEngine& engine, const std::string& symbol) {
+    showBook(engine, symbol);
 
-    while (true) {
-        clearScreen();
-        showBook(engine, symbol);
+    std::cout << Color::YELLOW << Color::BOLD
+              << "RECENT TRADES"
+              << Color::RESET << "\n";
 
-        std::cout << Color::BOLD
-                  << "New order (B = buy, S = sell, Q = quit)\n"
-                  << Color::RESET;
-        std::cout << "Side (B/S/Q): ";
+    const auto& trades = engine.getRecentTrades();
+    if (trades.empty()) {
+        std::cout << "(no trades yet)\n\n";
+    } else {
+        std::cout << std::left
+                  << std::setw(6)  << "BUY"
+                  << std::setw(6)  << "SELL"
+                  << std::setw(10) << "PRICE"
+                  << std::setw(10) << "QTY"
+                  << "\n";
 
-        char sideChar;
-        std::cin >> sideChar;
-        if (!std::cin) {
-            break;
+        for (const auto& t : trades) {
+            std::cout << std::setw(6)  << t.buyId
+                      << std::setw(6)  << t.sellId
+                      << std::setw(10) << std::fixed << std::setprecision(2) << t.price
+                      << std::setw(10) << t.quantity
+                      << "\n";
         }
+        std::cout << "\n";
+    }
 
-        if (sideChar == 'Q' || sideChar == 'q') {
-            break;
-        }
+    std::cout << Color::BOLD << "STATS" << Color::RESET << "\n";
+    std::cout << "Last match price:      ";
+    if (engine.getLastMatchTick() == 0) {
+        std::cout << "n/a\n";
+    } else {
+        std::cout << std::fixed << std::setprecision(2)
+                  << engine.getLastMatchPrice() << "\n";
+    }
+    std::cout << "Total orders submitted: " << engine.getTotalOrdersSubmitted() << "\n";
+    std::cout << "Total executed volume:  " << engine.getTotalExecutedVolume() << "\n\n";
+}
 
-        Side side;
-        if (sideChar == 'B' || sideChar == 'b') {
-            side = Side::BUY;
-        } else if (sideChar == 'S' || sideChar == 's') {
-            side = Side::SELL;
-        } else {
-            continue;
-        }
+void generateRandomOrders(MatchingEngine& engine,
+                          const std::string& symbol,
+                          std::mt19937& rng)
+{
+    std::uniform_int_distribution<int> countDist(0, 3);
+    int n = countDist(rng);
 
-        double price;
-        int qty;
+    std::bernoulli_distribution sideDist(0.5);
+    std::uniform_real_distribution<double> priceDist(95.0, 105.0);
+    std::uniform_int_distribution<int> qtyDist(1, 100);
 
-        std::cout << "Price: ";
-        std::cin >> price;
-        std::cout << "Quantity: ";
-        std::cin >> qty;
-
-        if (!std::cin || qty <= 0 || price <= 0.0) {
-            std::cout << "Invalid input. Exiting.\n";
-            break;
-        }
+    for (int i = 0; i < n; ++i) {
+        Side side = sideDist(rng) ? Side::BUY : Side::SELL;
+        double price = priceDist(rng);
+        int qty = qtyDist(rng);
 
         Order* o = engine.createOrder(symbol, side, price, qty);
         engine.submitOrder(o);
     }
+}
 
-    std::cout << "Exiting...\n";
+int main() {
+    MatchingEngine engine;
+    const std::string symbol = "ABC";
+
+    std::random_device rd;
+    std::mt19937 rng(rd());
+
+    while (true) {
+        generateRandomOrders(engine, symbol, rng);
+
+        clearScreen();
+        showDashboard(engine, symbol);
+
+        std::cout << "Press Ctrl+C to stop...\n";
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+
     return 0;
 }
